@@ -4,6 +4,7 @@
 
 package io.airbyte.integrations.base;
 
+import io.airbyte.commons.concurrency.VoidCallable;
 import io.airbyte.commons.functional.CheckedBiConsumer;
 import io.airbyte.protocol.models.v0.AirbyteMessage;
 
@@ -43,7 +44,7 @@ public interface SerializedAirbyteMessageConsumer extends CheckedBiConsumer<Stri
    * @throws Exception exception
    */
   @Override
-  void accept(String message, Integer sizeInBytes) throws Exception;
+  void accept(final String message, final Integer sizeInBytes) throws Exception;
 
   /**
    * Executes at the end of consumption of all incoming streamed data regardless of success or failure
@@ -52,5 +53,31 @@ public interface SerializedAirbyteMessageConsumer extends CheckedBiConsumer<Stri
    */
   @Override
   void close() throws Exception;
+
+  /**
+   * Append a function to be called on {@link AirbyteMessageConsumer#close}.
+   */
+  static SerializedAirbyteMessageConsumer appendOnClose(final SerializedAirbyteMessageConsumer consumer, final VoidCallable voidCallable) {
+    return new SerializedAirbyteMessageConsumer() {
+
+      @Override
+      public void start() throws Exception {
+        consumer.start();
+      }
+
+      @Override
+      public void accept(final String message, final Integer sizeInBytes) throws Exception {
+        consumer.accept(message, sizeInBytes);
+      }
+
+
+      @Override
+      public void close() throws Exception {
+        consumer.close();
+        voidCallable.call();
+      }
+
+    };
+  }
 
 }
